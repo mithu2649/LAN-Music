@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Admin Player</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
+    />
+
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.js"
+      integrity="sha512-8BHxHDLsOHx+flIrQ0DrZcea7MkHqRU5GbTHmbdzMRnAaoCIkZ97PqZcXJkKZckMMhqfoeaJE+DNUVuyoQsO3Q=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Admin Panel</h1>
+      <button id="playNext">Play Next</button>
+      <ul id="queueList"></ul>
+    </div>
+    <script>
+      const socket = io();
+      const queueList = document.getElementById("queueList");
+      const playNext = document.getElementById("playNext");
+
+      playNext.addEventListener("click", () => {
+        socket.emit("playNext");
+      });
+
+      socket.on("queueUpdate", (queue) => {
+        queueList.innerHTML = "";
+        queue.forEach((song, index) => {
+          const li = document.createElement("li");
+          li.textContent = `${index + 1}. ${song.title}`;
+          queueList.appendChild(li);
+        });
+      });
+    </script>
+  </body>
+</html>

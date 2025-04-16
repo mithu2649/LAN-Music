@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Music Queue</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.js" integrity="sha512-8BHxHDLsOHx+flIrQ0DrZcea7MkHqRU5GbTHmbdzMRnAaoCIkZ97PqZcXJkKZckMMhqfoeaJE+DNUVuyoQsO3Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script> 
+  <link
+  rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
+  >
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<style>
+
+
+  .main-container {
+    padding: 1rem;
+    max-width: 70rem;
+    margin: 0 auto;
+    margin-top: 1rem;
+    display: flex;
+    gap: 3rem;
+  }
+  form h4 {
+    margin-top: 0 !important;
+    margin: 0;
+  }
+  #queueList {
+    list-style-type: none !important;
+    margin: 0;
+    padding: 1rem;
+    li {
+      list-style:  none !important;
+    }
+  }
+
+  header .container {
+    max-width: 69rem; 
+  }
+
+.small-button {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+.songQueue {
+  width: 70%;
+}
+
+
+  @media (max-width: 720px) {
+  .main-container {
+    display: flex ;
+    flex-direction: column;
+    width: 100% ;
+    max-width: none !important;
+  }
+  .songQueue {
+    width: 100%;
+  }
+}
+
+.message {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.msg-user {
+  background: cadetblue;
+  color: black;
+  border-radius: 1rem;
+  width: 4rem;
+  display: inline-block;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  text-align: center;
+  height: 1.5rem;
+}
+.msg {
+  background: #c8c8ffa8;
+  color: black;
+  width: 100%;
+  border-radius: 1rem;
+  display: inline-block;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  text-align: left;
+}
+
+</style>
+</head>
+<body>
+
+  <header>
+    <nav>
+      <div class="container">
+        <h3>Local Music</h3>
+      </div>
+    </nav>
+  </header>
+
+  <div class="main-container">
+    <div class="songQueue">
+      <div>
+        <h3 style="color: white;">Add Song to Queue</h3>
+        <form id="addForm">
+          <input type="text" id="youtubeLink" placeholder="YouTube Link" required>
+          <button type="submit">Add</button>
+        </form>
+    </div>
+
+      <p>Currently Paying:</p>
+      <h4 id="currentSong"></h4>
+      
+      <h4>Playing Next:</h4>
+      <!-- <button id="playNext" class="small-button">Play Next</button> -->
+      <ul id="queueList"></ul>
+    </div>
+
+    <div class="chatContainer">
+      <h3 style="color: white;">Chat:</h3>
+    
+      <div id="chats" style="height: 500px; overflow-y: auto; background: #ffffff02; padding: 10px; margin-bottom: 10px;">
+        <div class="tips">Tip: Type <code>next</code> or <code>skip</code> to skip current song and <code>refresh</code> to refresh app for everyone</div>
+        <!-- Messages will appear here -->
+      </div>
+    
+      <form id="chatForm">
+        <input type="text" id="chatInput" placeholder="Type your message..." required>
+        <button type="submit">Send</button>
+      </form>
+    </div>
+    
+  </div>
+
+
+  <audio id="messageSoundOthers" src="/newmessage.mp3" preload="auto"></audio>
+  <audio id="messageSoundSelf" src="/messagesent.mp3" preload="auto"></audio>
+
+
+  <script>
+  const socket = io();
+  const form = document.getElementById('addForm');
+  const input = document.getElementById('youtubeLink');
+  const queueList = document.getElementById('queueList');
+  const currentSong = document.getElementById('currentSong');
+  const playNext = document.getElementById("playNext");
+
+
+  function extractVideoId(url) {
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.hostname === 'youtu.be') {
+        return parsedUrl.pathname.slice(1); // remove the leading slash
+      } else if (parsedUrl.hostname.includes('youtube.com')) {
+        return parsedUrl.searchParams.get('v');
+      }
+    } catch (e) {
+      console.error('Invalid URL', e);
+    }
+    return null;
+  }
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const videoId = extractVideoId(input.value);
+    if (videoId) {
+      const cleanedUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      socket.emit('addSong', cleanedUrl);
+    } else {
+      alert('Invalid YouTube URL');
+    }
+    input.value = '';
+  });
+
+  socket.on('queueUpdate', queue => {
+    queueList.innerHTML = '';
+    queue.forEach((song, index) => {
+      const li = document.createElement('li');
+      li.innerHTML = `<i class="fa-brands fa-youtube"></i> ${song.title}`;
+      queueList.appendChild(li);
+    });
+  });
+
+  socket.on('playingNow', song => {
+    currentSong.innerHTML = song;
+  });
+  playNext.addEventListener("click", () => {
+    socket.emit("playNext");
+  });
+  </script>
+
+<script>
+  const userName = localStorage.getItem('userName');
+
+  if (!userName) {
+    const name = prompt("What's your name?");
+    if (name) {
+      localStorage.setItem('userName', name);
+      document.getElementById('greeting').textContent = `Hello, ${name}!`;
+    }
+  }
+</script>
+
+<script>
+  const chatForm = document.getElementById('chatForm');
+  const chatInput = document.getElementById('chatInput');
+  const chats = document.getElementById('chats');
+
+  chatForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const message = chatInput.value.trim();
+    const name = localStorage.getItem('userName') || 'Anonymous';
+    socket.emit('sendMessage', { name, message });
+    chatInput.value = '';
+  });
+
+  socket.on('newMessage', ({ name, message }) => {
+
+  if(message=='refresh'){window.location.reload(); return; } 
+
+  const currentUser = localStorage.getItem('userName') || 'Anonymous';
+  const msgDiv = document.createElement('div');
+  msgDiv.classList.add('message');
+  msgDiv.innerHTML = `<span class="msg-user">${name}</span> <span class="msg">${message}</span>`;
+  chats.appendChild(msgDiv);
+  chats.scrollTop = chats.scrollHeight;
+
+  if (name === currentUser) {
+    const selfSound = document.getElementById('messageSoundSelf');
+    if (selfSound) selfSound.play();
+  } else {
+    const otherSound = document.getElementById('messageSoundOthers');
+    if (otherSound) otherSound.play();
+  }
+});
+
+</script>
+
+</body>
+</html>
